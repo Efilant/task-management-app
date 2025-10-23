@@ -3,6 +3,8 @@ Task serializers for API.
 """
 
 from rest_framework import serializers
+from django.utils import timezone
+from datetime import timedelta
 from .models import Task
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -27,6 +29,19 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ['title', 'description', 'category', 'priority', 'due_date']
+    
+    def validate_due_date(self, value):
+        """Validate that due_date is at least 30 minutes from now"""
+        now = timezone.now()
+        min_due_date = now + timedelta(minutes=30)
+        
+        if value < min_due_date:
+            raise serializers.ValidationError(
+                f"Görev tarihi en az {min_due_date.strftime('%d.%m.%Y %H:%M')} tarihinden sonra olmalıdır. "
+                f"(En az 30 dakika sonrası)"
+            )
+        
+        return value
     
     def create(self, validated_data):
         """Create a new task for the authenticated user"""

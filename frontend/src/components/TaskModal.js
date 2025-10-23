@@ -51,8 +51,21 @@ const TaskModal = ({ task, onClose, onSave }) => {
       newErrors.title = 'Başlık gereklidir';
     }
 
-    if (formData.due_date && new Date(formData.due_date) < new Date()) {
-      newErrors.due_date = 'Bitiş tarihi geçmiş bir tarih olamaz';
+    if (formData.due_date) {
+      const selectedDate = new Date(`${formData.due_date}T${formData.due_time || '00:00'}`);
+      const now = new Date();
+      const minDate = new Date(now.getTime() + 30 * 60 * 1000); // 30 dakika sonra
+
+      if (selectedDate < minDate) {
+        const minDateTime = minDate.toLocaleString('tr-TR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        newErrors.due_date = `Görev tarihi en az ${minDateTime} tarihinden sonra olmalıdır. (En az 30 dakika sonrası)`;
+      }
     }
 
     setErrors(newErrors);
