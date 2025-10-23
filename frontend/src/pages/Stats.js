@@ -84,6 +84,21 @@ const Stats = () => {
     const completed = categoryTasks.filter(task => task.status === 'completed').length;
     const notCompleted = categoryTasks.filter(task => task.status !== 'completed').length;
 
+    // Eğer hiç görev yoksa boş grafik göster
+    if (categoryTasks.length === 0) {
+      return {
+        labels: ['Görev Yok'],
+        datasets: [
+          {
+            data: [1],
+            backgroundColor: ['#E5E7EB'],
+            borderColor: ['#9CA3AF'],
+            borderWidth: 2,
+          },
+        ],
+      };
+    }
+
     return {
       labels: ['Tamamlanmış', 'Tamamlanmamış'],
       datasets: [
@@ -368,6 +383,39 @@ const Stats = () => {
             <div className="text-sm text-gray-600">Tamamlanmamış</div>
           </div>
         </div>
+
+        {/* Kategoriye göre detaylı durum */}
+        {categoryTasks.length > 0 && (
+          <div className="mt-6">
+            <h4 className="text-md font-semibold text-gray-900 mb-3">Detaylı Durum</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <div className="text-lg font-bold text-blue-600">
+                  {categoryTasks.filter(task => task.status === 'pending').length}
+                </div>
+                <div className="text-xs text-gray-600">Bekleyen</div>
+              </div>
+              <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                <div className="text-lg font-bold text-yellow-600">
+                  {categoryTasks.filter(task => task.status === 'in_progress').length}
+                </div>
+                <div className="text-xs text-gray-600">Devam Ediyor</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-lg font-bold text-green-600">
+                  {categoryTasks.filter(task => task.status === 'completed').length}
+                </div>
+                <div className="text-xs text-gray-600">Tamamlanmış</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg">
+                <div className="text-lg font-bold text-red-600">
+                  {categoryTasks.filter(task => task.status === 'cancelled').length}
+                </div>
+                <div className="text-xs text-gray-600">İptal Edilmiş</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Additional Stats */}
