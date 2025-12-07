@@ -182,6 +182,21 @@ export const authService = {
     }
   },
 
+  updateUserRole: async (userId, role) => {
+    try {
+      const response = await api.put('/auth/update-user-role/', {
+        user_id: userId,
+        role: role
+      });
+      toast.success('Kullanıcı rolü başarıyla güncellendi!');
+      return response;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Rol güncellenirken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
+
   resendVerificationCode: async (email) => {
     try {
       const response = await api.post('/auth/resend-verification-code/', { email });
@@ -339,6 +354,17 @@ export const taskService = {
       return response;
     } catch (error) {
       const message = error.response?.data?.error || 'Süresi geçen görevler yüklenirken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
+
+  getUsers: async () => {
+    try {
+      const response = await api.get('/tasks/users/');
+      return response;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Kullanıcılar yüklenirken bir hata oluştu';
       toast.error(message);
       throw error;
     }

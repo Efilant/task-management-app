@@ -223,8 +223,19 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAdmin])
     def users(self, request):
         """Görev ataması için tüm kullanıcıları al (sadece admin)"""
-        users = User.objects.filter(is_active=True).values('id', 'username', 'email', 'first_name', 'last_name')
-        return Response(list(users))
+        users = User.objects.filter(is_active=True).select_related('profile')
+        user_list = []
+        for user in users:
+            user_role = user.profile.role if hasattr(user, 'profile') else 'user'
+            user_list.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user_role
+            })
+        return Response(user_list)
     
     @action(detail=True, methods=['patch'], permission_classes=[IsAdmin])
     def assign(self, request, pk=None):

@@ -93,6 +93,15 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
     - **Parametreler**: `code`, `email`, `new_password`
     - **İşlemler**: Kod ve e-posta kontrolü, yeni şifre güç kontrolü, şifre değiştirme
 
+11. **`update_user_role(request)`** - PUT `/api/auth/update-user-role/` (Admin only)
+    - **İşlev**: Kullanıcı rolünü günceller (sadece admin)
+    - **Parametreler**: `user_id`, `role` ('admin' veya 'user')
+    - **İşlemler**: 
+      - Kullanıcı ID ve rol doğrulaması
+      - UserProfile oluşturulur veya güncellenir
+      - Rol değişikliği kaydedilir
+    - **Dönen Veri**: Güncellenmiş kullanıcı bilgileri
+
 **Yardımcı Fonksiyonlar:**
 - `validate_password_strength(password)`: Şifre güç kontrolü yapar
 - `validate_email(email)`: E-posta formatı kontrolü yapar
@@ -113,6 +122,7 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 - `/reset-password/` → `reset_password` view
 - `/profile/` → `profile` view
 - `/change-password/` → `change_password` view
+- `/update-user-role/` → `update_user_role` view (admin only)
 
 ---
 
@@ -264,7 +274,7 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
    
    - **`users`** - GET `/api/tasks/users/` (Admin only)
      - Tüm aktif kullanıcıları döndürür (görev ataması için)
-     - **Dönen Veri**: `id`, `username`, `email`, `first_name`, `last_name`
+     - **Dönen Veri**: `id`, `username`, `email`, `first_name`, `last_name`, `role` (kullanıcı rolü: 'admin' veya 'user')
    
    - **`assign`** - PATCH `/api/tasks/{id}/assign/` (Admin only)
      - Görevi bir kullanıcıya atar
@@ -490,6 +500,7 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
    - `updateProfile(profileData)`: Profil bilgilerini günceller
    - `changePassword(passwordData)`: Şifre değiştirir
    - `resendVerificationCode(email)`: Doğrulama kodunu yeniden gönderir
+   - `updateUserRole(userId, role)`: Kullanıcı rolünü günceller (admin only, 'admin' veya 'user')
 
 2. **`taskService`**: Görev işlemleri
    - `getTasks(params)`: Görevleri getirir (filtreleme parametreleri ile)
@@ -522,8 +533,8 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 
 **Özellikler:**
 - **İstatistik Kartları**: Toplam, bekleyen, devam eden, tamamlanan, iptal edilmiş görev sayıları
-- **Filtreleme**: Durum, öncelik, kategori
-- **Arama**: Başlık ve açıklamada arama
+- **Filtreleme**: Durum, öncelik, kategori, kullanıcı (admin için)
+- **Arama**: Başlık, açıklama, kullanıcı adı ve e-posta adresinde arama
 - **Sıralama**: Tarih, öncelik, alfabetik
 - **Görev Grid'i**: TaskCard component'leri ile görev listesi
 - **Modal**: TaskModal ile görev oluşturma/düzenleme
@@ -545,6 +556,8 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 **Admin Özellikleri:**
 - Header'da "Tüm görevleri yönetin (Admin)" mesajı
 - Normal kullanıcı için "Kendi görevlerinizi yönetin" mesajı
+- Kullanıcı filtresi dropdown'ı (tüm kullanıcılar listelenir, seçilen kullanıcının görevleri gösterilir)
+- Arama çubuğunda kullanıcı adı ve e-posta ile arama yapılabilir
 
 ---
 
@@ -588,12 +601,25 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
   - İşlemler: Görev atama, silme
 - **Arama**: Görev başlığı, açıklama, kullanıcı adında arama
 - **Modal**: Görev atama modal'ı (kullanıcı seçimi)
+- **Kullanıcı Kartları** (Kullanıcılar sekmesi):
+  - Kullanıcı bilgileri (ad, soyad, username, email)
+  - Mevcut rol gösterimi (👑 Admin veya 👤 Kullanıcı badge'i)
+  - Admin kullanıcılar için 👑 ikonu
+  - "Görev Ata" butonu: Seçilen kullanıcıya görev atamak için TaskModal açar
+  - "Rol Değiştir" dropdown'ı: Kullanıcı rolünü anında değiştirir (admin ↔ user)
+  - Rol değişikliği otomatik olarak kaydedilir ve kullanıcı listesi yenilenir
 
 **Methodlar:**
 - `fetchAllTasks()`: Tüm görevleri getirir
-- `fetchUsers()`: Tüm kullanıcıları getirir
+- `fetchUsers()`: Tüm kullanıcıları getirir (rol bilgisi dahil)
 - `handleAssignTask(taskId, userId)`: Görevi bir kullanıcıya atar
 - `handleDeleteTask(taskId)`: Görevi siler
+- `handleUpdateUserRole(userId, newRole)`: Kullanıcı rolünü günceller (admin ↔ user)
+- `handleCreateTaskForUser(userId)`: Belirli bir kullanıcı için görev oluşturma modal'ını açar
+- `handleTaskModalSave(taskData, files)`: TaskModal'dan gelen görev verilerini kaydeder
+  - Seçilen kullanıcıya görev atar
+  - Dosya ekleme desteği
+  - Görev oluşturma veya güncelleme işlemlerini yönetir
 
 **Permission Kontrolü:**
 - Admin değilse Dashboard'a yönlendirir
@@ -747,6 +773,12 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 - `users` state'i ile kullanıcı listesi yüklenir (`taskService.getUsers()`)
 - Seçilen kullanıcıya görev atanır (`assigned_user_id` ile)
 - "Kendime ata" seçeneği kaldırılmıştır (admin mutlaka bir kullanıcı seçmelidir)
+- **Kullanıcı Rolü Yönetimi**:
+  - Kullanıcı seçildiğinde mevcut rolü otomatik gösterilir
+  - "Kullanıcı Rolü" dropdown'ı ile rol değiştirilebilir (👤 Kullanıcı ↔ 👑 Admin)
+  - Rol değişikliği görev kaydedilirken otomatik olarak uygulanır
+  - Kullanıcı seçilmediğinde rol dropdown'ı devre dışıdır
+  - Kullanıcı listesinde admin kullanıcılar 👑 ikonu ile işaretlenir
 
 ---
 
@@ -838,6 +870,7 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 - `GET /api/auth/profile/` - Profil bilgileri
 - `PUT /api/auth/profile/` - Profil güncelleme
 - `POST /api/auth/change-password/` - Şifre değiştirme
+- `PUT /api/auth/update-user-role/` - Kullanıcı rolü güncelleme (admin only)
 
 ### Tasks:
 - `GET /api/tasks/` - Görev listesi
@@ -875,6 +908,9 @@ Bu dokümantasyon, görev yönetim uygulamasının tüm dosyalarını, methodlar
 6. **Şifre Sıfırlama**: 6 haneli kod, 3 dakika geçerli
 7. **Admin Kontrolleri**: Backend'de `IsAdmin` permission class ile kontrol edilir
 8. **Role-Based Access**: Normal kullanıcılar sadece kendi görevlerini görür, admin tüm görevleri görür
+9. **Kullanıcı Rolü Yönetimi**: Admin kullanıcılar, görev atarken veya Admin Panel'den kullanıcı rolünü değiştirebilir
+10. **Kullanıcı Filtreleme**: Admin panelinde görev listesinde kullanıcıya göre filtreleme yapılabilir
+11. **Kullanıcı Arama**: Görev arama çubuğunda kullanıcı adı ve e-posta adresi ile arama yapılabilir
 
 ---
 

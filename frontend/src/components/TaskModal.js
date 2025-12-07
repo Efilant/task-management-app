@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Tag, AlertCircle, Paperclip, Trash2, Download, Eye } from 'lucide-react';
+import { X, Calendar, Clock, Tag, AlertCircle, Paperclip, Trash2, Download, Eye, User } from 'lucide-react';
 import { format } from 'date-fns';
-import { attachmentService, taskService } from '../services/authService';
+import { attachmentService, taskService, authService } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,7 @@ const TaskModal = ({ task, onClose, onSave }) => {
     due_date: '',
     due_time: '',
     assigned_user_id: null,
+    user_role: 'user',
   });
 
   const [errors, setErrors] = useState({});
@@ -37,6 +38,10 @@ const TaskModal = ({ task, onClose, onSave }) => {
       }
 
       const taskDate = task.due_date ? new Date(task.due_date) : null;
+      // Kullanıcı ID'sini al (task.user veya task.user_id olabilir)
+      const userId = task.user || task.user_id;
+      // Kullanıcının mevcut rolünü bul (users yüklendiyse)
+      const selectedUser = users.find(u => u.id === userId);
       setFormData({
         title: task.title || '',
         description: task.description || '',
@@ -44,7 +49,8 @@ const TaskModal = ({ task, onClose, onSave }) => {
         priority: task.priority || 'medium',
         due_date: taskDate ? format(taskDate, 'yyyy-MM-dd') : '',
         due_time: taskDate ? format(taskDate, 'HH:mm') : '',
-        assigned_user_id: task.user_id || null,
+        assigned_user_id: userId || null,
+        user_role: selectedUser?.role || 'user',
       });
 
       // Düzenlemede her zaman en güncel veriyi almak için eklentileri yükle
@@ -71,9 +77,33 @@ const TaskModal = ({ task, onClose, onSave }) => {
       }
     } else {
       setExistingAttachments([]);
+      // Yeni görev oluşturma durumu
+      setFormData({
+        title: '',
+        description: '',
+        category: 'other',
+        priority: 'medium',
+        due_date: '',
+        due_time: '',
+        assigned_user_id: null,
+        user_role: 'user',
+      });
     }
     setSelectedFiles([]);
   }, [task]);
+
+  // Users yüklendiğinde, eğer task varsa ve kullanıcı seçiliyse rolü güncelle
+  useEffect(() => {
+    if (task && users.length > 0 && formData.assigned_user_id) {
+      const selectedUser = users.find(u => u.id === formData.assigned_user_id);
+      if (selectedUser && selectedUser.role !== formData.user_role) {
+        setFormData(prev => ({
+          ...prev,
+          user_role: selectedUser.role
+        }));
+      }
+    }
+  }, [users]);
 
   const loadUsers = async () => {
     try {
@@ -120,10 +150,21 @@ const TaskModal = ({ task, onClose, onSave }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+
+    // Kullanıcı seçildiğinde mevcut rolünü ayarla
+    if (name === 'assigned_user_id' && value) {
+      const selectedUser = users.find(u => u.id === parseInt(value, 10));
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+        user_role: selectedUser?.role || 'user'
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
 
     // Kullanıcı yazmaya başladığında hatayı temizle
     if (errors[name]) {
@@ -241,6 +282,19 @@ const TaskModal = ({ task, onClose, onSave }) => {
         return;
       }
       taskData.assigned_user_id = parseInt(formData.assigned_user_id, 10);
+
+      // Rol güncellemesi yapılacaksa
+      const selectedUser = users.find(u => u.id === parseInt(formData.assigned_user_id, 10));
+      if (selectedUser && selectedUser.role !== formData.user_role) {
+        try {
+          await authService.updateUserRole(parseInt(formData.assigned_user_id, 10), formData.user_role);
+          // Kullanıcı listesini güncelle
+          await loadUsers();
+        } catch (error) {
+          console.error('Error updating user role:', error);
+          // Rol güncelleme hatası olsa bile görev kaydına devam et
+        }
+      }
     }
 
     // Normal kullanıcılar için assigned_user_id gönderme (backend otomatik kendisine atayacak)
@@ -383,29 +437,61 @@ const TaskModal = ({ task, onClose, onSave }) => {
 
                 {/* Admin: Assign User */}
                 {isAdmin && (
-                  <div>
-                    <label htmlFor="assigned_user_id" className="block text-sm font-medium text-gray-700 mb-1">
-                      Kullanıcı Ata (Admin) *
-                    </label>
-                    <select
-                      id="assigned_user_id"
-                      name="assigned_user_id"
-                      value={formData.assigned_user_id || ''}
-                      onChange={handleChange}
-                      required
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.assigned_user_id ? 'border-red-300' : 'border-gray-300'}`}
-                    >
-                      <option value="">Kullanıcı seçin...</option>
-                      {users.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.first_name || ''} {user.last_name || ''} ({user.username})
-                        </option>
-                      ))}
-                    </select>
-                    {errors.assigned_user_id && (
-                      <p className="mt-1 text-sm text-red-600">{errors.assigned_user_id}</p>
-                    )}
-                  </div>
+                  <>
+                    <div>
+                      <label htmlFor="assigned_user_id" className="block text-sm font-medium text-gray-700 mb-1">
+                        <User className="inline h-4 w-4 mr-1" />
+                        Kullanıcı Ata (Admin) *
+                      </label>
+                      <select
+                        id="assigned_user_id"
+                        name="assigned_user_id"
+                        value={formData.assigned_user_id || ''}
+                        onChange={handleChange}
+                        required
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.assigned_user_id ? 'border-red-300' : 'border-gray-300'}`}
+                      >
+                        <option value="">Kullanıcı seçin...</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.first_name || ''} {user.last_name || ''} ({user.username}) {user.role === 'admin' ? '👑' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.assigned_user_id && (
+                        <p className="mt-1 text-sm text-red-600">{errors.assigned_user_id}</p>
+                      )}
+                    </div>
+
+                    <div className="mt-4">
+                      <label htmlFor="user_role" className="block text-sm font-medium text-gray-700 mb-1">
+                        👤 Kullanıcı Rolü {formData.assigned_user_id ? `(Seçili: ${users.find(u => u.id === parseInt(formData.assigned_user_id, 10))?.username || 'Bilinmiyor'})` : ''}
+                      </label>
+                      <select
+                        id="user_role"
+                        name="user_role"
+                        value={formData.user_role}
+                        onChange={handleChange}
+                        disabled={!formData.assigned_user_id || String(formData.assigned_user_id).trim() === ''}
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!formData.assigned_user_id || String(formData.assigned_user_id).trim() === ''
+                            ? 'bg-gray-100 cursor-not-allowed opacity-60'
+                            : 'bg-white'
+                          }`}
+                      >
+                        <option value="user">👤 Kullanıcı</option>
+                        <option value="admin">👑 Admin</option>
+                      </select>
+                      {!formData.assigned_user_id || String(formData.assigned_user_id).trim() === '' ? (
+                        <p className="mt-1 text-xs text-gray-500">
+                          ⚠️ Önce bir kullanıcı seçmeniz gerekiyor
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Seçili kullanıcının rolünü değiştirebilirsiniz. Görev kaydedildiğinde rol güncellenecektir.
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {/* Due Date and Time */}

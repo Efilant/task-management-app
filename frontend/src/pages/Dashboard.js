@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Calendar, Clock, CheckCircle, Circle, AlertCircle, X } from 'lucide-react';
+import { Plus, Search, Filter, Calendar, Clock, CheckCircle, Circle, AlertCircle, X, User } from 'lucide-react';
 import { taskService, attachmentService } from '../services/authService';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
@@ -14,20 +14,34 @@ const Dashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({
     status: 'all',
     priority: 'all',
     category: 'all',
+    user: 'all',
   });
   const [sortBy, setSortBy] = useState('created_at');
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+    if (isAdmin) {
+      fetchUsers();
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     filterAndSortTasks();
   }, [tasks, searchTerm, filters, sortBy]);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await taskService.getUsers();
+      setUsers(response.data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
@@ -51,11 +65,13 @@ const Dashboard = () => {
   const filterAndSortTasks = () => {
     let filtered = [...tasks];
 
-    // Arama filtresi
+    // Arama filtresi (başlık, açıklama, kullanıcı adı ve e-posta)
     if (searchTerm) {
       filtered = filtered.filter(task =>
         task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        task.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.user_username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.user_email?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -72,6 +88,11 @@ const Dashboard = () => {
     // Kategori filtresi
     if (filters.category !== 'all') {
       filtered = filtered.filter(task => task.category === filters.category);
+    }
+
+    // Kullanıcı filtresi
+    if (filters.user !== 'all') {
+      filtered = filtered.filter(task => task.user === parseInt(filters.user));
     }
 
     // Sıralama
@@ -452,6 +473,21 @@ const Dashboard = () => {
                 <option value="priority">⚡ Öncelik</option>
                 <option value="title">🔤 Alfabetik</option>
               </select>
+
+              {isAdmin && (
+                <select
+                  className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm bg-white"
+                  value={filters.user}
+                  onChange={(e) => setFilters({ ...filters, user: e.target.value })}
+                >
+                  <option value="all">👤 Tüm Kişiler</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.username} {user.email ? `(${user.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 

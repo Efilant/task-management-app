@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { taskService } from '../services/authService';
-import { Shield, Users, ListTodo, UserPlus, Search, Trash2, UserCheck } from 'lucide-react';
+import { taskService, authService, attachmentService } from '../services/authService';
+import { Shield, Users, ListTodo, UserPlus, Search, Trash2, UserCheck, Plus, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Navigate } from 'react-router-dom';
+import TaskModal from '../components/TaskModal';
 
 const AdminPanel = () => {
   const { user, isAdmin } = useAuth();
@@ -15,6 +16,9 @@ const AdminPanel = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningTaskId, setAssigningTaskId] = useState(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [taskModalUser, setTaskModalUser] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
 
   const fetchAllTasks = useCallback(async () => {
     try {
@@ -81,6 +85,65 @@ const AdminPanel = () => {
         toast.error('Görev silinirken bir hata oluştu');
       }
     }
+  };
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    try {
+      await authService.updateUserRole(userId, newRole);
+      toast.success('Kullanıcı rolü başarıyla güncellendi!');
+      fetchUsers(); // Kullanıcı listesini yenile
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error('Rol güncellenirken bir hata oluştu');
+    }
+  };
+
+  const handleCreateTaskForUser = (userId) => {
+    setTaskModalUser(userId);
+    setEditingTask(null);
+    setShowTaskModal(true);
+  };
+
+  const handleTaskModalSave = async (taskData, files = []) => {
+    try {
+      // Eğer taskModalUser varsa, görevi o kullanıcıya ata
+      if (taskModalUser) {
+        taskData.assigned_user_id = parseInt(taskModalUser, 10);
+      }
+
+      if (editingTask) {
+        await taskService.updateTask(editingTask.id, taskData);
+        if (files.length > 0) {
+          for (const file of files) {
+            await attachmentService.uploadAttachment(editingTask.id, file);
+          }
+        }
+        toast.success('Görev başarıyla güncellendi!');
+      } else {
+        const response = await taskService.createTask(taskData);
+        const taskId = response.data?.id || response.data?.pk || response.data?.id;
+        if (files.length > 0 && taskId) {
+          for (const file of files) {
+            await attachmentService.uploadAttachment(taskId, file);
+          }
+        }
+        toast.success('Görev başarıyla oluşturuldu!');
+      }
+
+      setShowTaskModal(false);
+      setTaskModalUser(null);
+      setEditingTask(null);
+      fetchAllTasks();
+    } catch (error) {
+      console.error('Error saving task:', error);
+      toast.error('Görev kaydedilirken bir hata oluştu');
+    }
+  };
+
+  const handleTaskModalClose = () => {
+    setShowTaskModal(false);
+    setTaskModalUser(null);
+    setEditingTask(null);
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -317,17 +380,54 @@ const AdminPanel = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {users.map((userItem) => (
-                  <div key={userItem.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">
-                          {userItem.first_name || ''} {userItem.last_name || ''}
-                          {(!userItem.first_name && !userItem.last_name) && userItem.username}
-                        </h3>
+                  <div key={userItem.id} className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {userItem.first_name || ''} {userItem.last_name || ''}
+                            {(!userItem.first_name && !userItem.last_name) && userItem.username}
+                          </h3>
+                          {userItem.role === 'admin' && (
+                            <Crown className="h-4 w-4 text-yellow-500" title="Admin" />
+                          )}
+                        </div>
                         <p className="text-sm text-gray-500">{userItem.username}</p>
                         <p className="text-xs text-gray-400">{userItem.email}</p>
+                        <div className="mt-2">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${userItem.role === 'admin'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-blue-100 text-blue-800'
+                            }`}>
+                            {userItem.role === 'admin' ? '👑 Admin' : '👤 Kullanıcı'}
+                          </span>
+                        </div>
                       </div>
-                      <Users className="h-8 w-8 text-gray-400" />
+                      <Users className="h-8 w-8 text-gray-400 flex-shrink-0 ml-2" />
+                    </div>
+
+                    <div className="flex flex-col gap-2 pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => handleCreateTaskForUser(userItem.id)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Görev Ata
+                      </button>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Rol Değiştir
+                        </label>
+                        <select
+                          value={userItem.role || 'user'}
+                          onChange={(e) => handleUpdateUserRole(userItem.id, e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="user">👤 Kullanıcı</option>
+                          <option value="admin">👑 Admin</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -393,6 +493,15 @@ const AdminPanel = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Task Modal for creating tasks for specific users */}
+      {showTaskModal && (
+        <TaskModal
+          task={editingTask || (taskModalUser ? { user: parseInt(taskModalUser, 10), user_id: parseInt(taskModalUser, 10) } : null)}
+          onClose={handleTaskModalClose}
+          onSave={handleTaskModalSave}
+        />
       )}
     </div>
   );

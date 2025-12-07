@@ -17,6 +17,8 @@ from django.utils import timezone
 from datetime import timedelta
 import hashlib
 import re
+from tasks_api.permissions import IsAdmin
+from .models import UserProfile
 
 def validate_password_strength(password):
     """
@@ -635,4 +637,49 @@ def change_password(request):
     except Exception as e:
         return Response({
             'error': f'Şifre değiştirilirken hata oluştu: {str(e)}'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsAdmin])
+def update_user_role(request):
+    """
+    Kullanıcı rolünü güncelle (sadece admin).
+    """
+    user_id = request.data.get('user_id')
+    new_role = request.data.get('role')
+    
+    if not user_id:
+        return Response({
+            'error': 'user_id gereklidir'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not new_role or new_role not in ['admin', 'user']:
+        return Response({
+            'error': 'Geçerli bir rol gereklidir (admin veya user)'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        target_user = User.objects.get(id=user_id)
+        
+        # Kullanıcı profilini al veya oluştur
+        profile, created = UserProfile.objects.get_or_create(user=target_user)
+        profile.role = new_role
+        profile.save()
+        
+        return Response({
+            'message': f'Kullanıcı rolü başarıyla güncellendi',
+            'user': {
+                'id': target_user.id,
+                'username': target_user.username,
+                'role': profile.role
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except User.DoesNotExist:
+        return Response({
+            'error': 'Kullanıcı bulunamadı'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            'error': f'Rol güncellenirken hata oluştu: {str(e)}'
         }, status=status.HTTP_400_BAD_REQUEST)
