@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Calendar, Clock, CheckCircle, Circle, AlertCircle, X } from 'lucide-react';
-import { taskService } from '../services/authService';
+import { taskService, attachmentService } from '../services/authService';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
+  const { user, isAdmin } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,15 @@ const Dashboard = () => {
   const fetchTasks = async () => {
     try {
       const response = await taskService.getTasks();
-      setTasks(response.data.results || response.data);
+      const tasks = response.data.results || response.data;
+      // Hata ayıklama: Eklentilerin dahil olup olmadığını kontrol et
+      if (process.env.NODE_ENV === 'development' && tasks.length > 0) {
+        console.log('Sample task with attachments:', tasks[0]);
+        console.log('Attachments in task:', tasks[0].attachments);
+        console.log('Attachments type:', typeof tasks[0].attachments);
+        console.log('Is array:', Array.isArray(tasks[0].attachments));
+      }
+      setTasks(tasks);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -41,7 +51,7 @@ const Dashboard = () => {
   const filterAndSortTasks = () => {
     let filtered = [...tasks];
 
-    // Search filter
+    // Arama filtresi
     if (searchTerm) {
       filtered = filtered.filter(task =>
         task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -49,22 +59,22 @@ const Dashboard = () => {
       );
     }
 
-    // Status filter
+    // Durum filtresi
     if (filters.status !== 'all') {
       filtered = filtered.filter(task => task.status === filters.status);
     }
 
-    // Priority filter
+    // Öncelik filtresi
     if (filters.priority !== 'all') {
       filtered = filtered.filter(task => task.priority === filters.priority);
     }
 
-    // Category filter
+    // Kategori filtresi
     if (filters.category !== 'all') {
       filtered = filtered.filter(task => task.category === filters.category);
     }
 
-    // Sort
+    // Sıralama
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'title':
@@ -83,33 +93,165 @@ const Dashboard = () => {
     setFilteredTasks(filtered);
   };
 
-  const handleCreateTask = async (taskData) => {
+  const handleCreateTask = async (taskData, files = []) => {
     try {
+      console.log('Creating task with data:', JSON.stringify(taskData, null, 2));
+      console.log('Files to upload:', files.length);
+
       const response = await taskService.createTask(taskData);
-      // Görevleri yeniden fetch et
+      console.log('Task created response:', response);
+      console.log('Task created response.data:', response.data);
+      console.log('Task created response.data.id:', response.data?.id);
+
+      // ID'yi farklı şekillerde almayı dene
+      const taskId = response.data?.id || response.data?.pk || response.id || response.pk;
+      console.log('Created task ID (after fallback):', taskId);
+
+      if (!taskId) {
+        toast.error('Görev oluşturuldu ama ID alınamadı!');
+        await fetchTasks();
+        setShowModal(false);
+        return;
+      }
+
+      // Varsa dosyaları yükle
+      let uploadSuccessCount = 0;
+      let uploadFailCount = 0;
+
+      if (files.length > 0 && taskId) {
+        console.log(`Starting to upload ${files.length} files to task ${taskId}`);
+
+        for (const file of files) {
+          try {
+            console.log('Uploading file to task:', taskId, 'File:', file.name, 'Size:', file.size);
+            const uploadResponse = await attachmentService.uploadAttachment(taskId, file);
+            uploadSuccessCount++;
+            console.log('File uploaded successfully:', file.name, 'Response:', uploadResponse);
+          } catch (error) {
+            console.error('Error uploading file:', file.name, error);
+            console.error('Error details:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            uploadFailCount++;
+            // Biri başarısız olsa bile diğer dosyalara devam et
+          }
+        }
+
+        if (uploadSuccessCount > 0 && uploadFailCount === 0) {
+          toast.success(`${uploadSuccessCount} dosya başarıyla yüklendi!`);
+        } else if (uploadSuccessCount > 0 && uploadFailCount > 0) {
+          toast.error(`${uploadSuccessCount} dosya yüklendi, ${uploadFailCount} dosya başarısız oldu`);
+        } else if (uploadFailCount > 0 && uploadSuccessCount === 0) {
+          toast.error('Tüm dosyalar yüklenirken hata oluştu!');
+        }
+      } else if (files.length > 0) {
+        console.warn('Files selected but no taskId available, taskId:', taskId);
+      }
+
+      // Dosyalar yüklendiyse biraz bekle (backend'de işlenmesi için)
+      if (files.length > 0 && uploadSuccessCount > 0) {
+        console.log('Waiting for backend to process attachments...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Görevleri yeniden yükle (attachments dahil)
+      console.log('Refreshing tasks list after creation...');
       await fetchTasks();
+
+      // Attachments'ların geldiğini kontrol et
+      if (taskId && files.length > 0) {
+        const createdTask = tasks.find(t => t.id === taskId);
+        if (createdTask) {
+          console.log('Created task found in list:', createdTask);
+          console.log('Task attachments:', createdTask.attachments);
+        } else {
+          console.warn('Created task not found in list, taskId:', taskId);
+        }
+      }
+
       setShowModal(false);
     } catch (error) {
       console.error('Error creating task:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      console.error('Error headers:', error.response?.headers);
+      console.error('Full error object:', JSON.stringify(error.response?.data, null, 2));
+
+      // Daha detaylı hata mesajı
+      let errorMessage = 'Görev oluşturulurken bir hata oluştu';
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        // Nested error mesajlarını kontrol et
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (Array.isArray(errorData)) {
+          errorMessage = errorData.join(', ');
+        } else {
+          // Field errors'ı birleştir
+          const fieldErrors = [];
+          Object.keys(errorData).forEach(key => {
+            if (Array.isArray(errorData[key])) {
+              fieldErrors.push(`${key}: ${errorData[key].join(', ')}`);
+            } else {
+              fieldErrors.push(`${key}: ${errorData[key]}`);
+            }
+          });
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join(' | ');
+          }
+        }
+      }
+      toast.error(errorMessage);
     }
   };
 
-  const handleUpdateTask = async (taskData) => {
+  const handleUpdateTask = async (taskData, files = []) => {
     try {
       const response = await taskService.updateTask(editingTask.id, taskData);
-      // Görevleri yeniden fetch et
+      const taskId = editingTask.id;
+
+      // Upload new files if any
+      if (files.length > 0 && taskId) {
+        let uploadSuccessCount = 0;
+        let uploadFailCount = 0;
+        for (const file of files) {
+          try {
+            console.log('Uploading file to task:', taskId, 'File:', file.name);
+            await attachmentService.uploadAttachment(taskId, file);
+            uploadSuccessCount++;
+          } catch (error) {
+            console.error('Error uploading file:', file.name, error);
+            console.error('Error details:', error.response?.data);
+            uploadFailCount++;
+            // Biri başarısız olsa bile diğer dosyalara devam et
+          }
+        }
+        if (uploadSuccessCount > 0 && uploadFailCount === 0) {
+          toast.success(`${uploadSuccessCount} dosya başarıyla yüklendi!`);
+        } else if (uploadSuccessCount > 0 && uploadFailCount > 0) {
+          toast.error(`${uploadSuccessCount} dosya yüklendi, ${uploadFailCount} dosya başarısız oldu`);
+        }
+      }
+
+      // Görevleri yeniden yükle
       await fetchTasks();
+
       setShowModal(false);
       setEditingTask(null);
     } catch (error) {
       console.error('Error updating task:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.detail || 'Görev güncellenirken bir hata oluştu';
+      toast.error(errorMessage);
     }
   };
 
   const handleDeleteTask = async (taskId) => {
     try {
       await taskService.deleteTask(taskId);
-      // Görevleri yeniden fetch et
+      // Görevleri yeniden yükle
       await fetchTasks();
     } catch (error) {
       console.error('Error deleting task:', error);
@@ -127,7 +269,7 @@ const Dashboard = () => {
         response = await taskService.updateTask(taskId, { status: newStatus });
       }
 
-      // Görevleri yeniden fetch et
+      // Görevleri yeniden yükle
       await fetchTasks();
     } catch (error) {
       console.error('Error updating task status:', error);
@@ -169,7 +311,11 @@ const Dashboard = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Görev Yönetim Merkezi</h1>
-        <p className="text-gray-600">Görevlerinizi yönetin ve takip edin</p>
+        <p className="text-gray-600">
+          {isAdmin
+            ? 'Tüm görevleri yönetin ve takip edin (Admin)'
+            : `Kendi görevlerinizi yönetin ve takip edin (${user?.username || 'Kullanıcı'})`}
+        </p>
       </div>
 
       {/* Stats Cards */}

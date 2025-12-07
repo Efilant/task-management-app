@@ -15,7 +15,7 @@ const VerifyEmail = () => {
     const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        // URL'den email parametresini al
+        // URL'den e-posta parametresini al
         const emailParam = searchParams.get('email');
         if (emailParam) {
             setEmail(emailParam);
@@ -45,7 +45,7 @@ const VerifyEmail = () => {
             setMessage(response.data.message || 'E-posta adresi başarıyla doğrulandı!');
             toast.success('E-posta doğrulandı! Giriş yapabilirsiniz.');
 
-            // 2 saniye sonra login sayfasına yönlendir
+            // 2 saniye sonra giriş sayfasına yönlendir
             setTimeout(() => {
                 navigate('/login');
             }, 2000);
@@ -81,7 +81,7 @@ const VerifyEmail = () => {
     };
 
     const handleCodeChange = (e) => {
-        const value = e.target.value.replace(/\D/g, ''); // Sadece rakam
+        const value = e.target.value.replace(/\D/g, ''); // Sadece rakamları al
         if (value.length <= 6) {
             setCode(value);
         }

@@ -13,7 +13,8 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { taskService } from '../services/authService';
-import { Calendar, TrendingUp, Target, AlertCircle, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Calendar, TrendingUp, Target, AlertCircle, X, User } from 'lucide-react';
 
 ChartJS.register(
   CategoryScale,
@@ -42,24 +43,48 @@ const getCategoryName = (category) => {
 };
 
 const Stats = () => {
+  const { isAdmin, user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('work'); // Varsayılan kategori
   const [categoryTasks, setCategoryTasks] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchUsers();
+    }
+    fetchStats();
+  }, [isAdmin]);
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [selectedUserId, isAdmin]);
 
   useEffect(() => {
     if (stats) {
       fetchCategoryTasks();
     }
-  }, [selectedCategory, stats]);
+  }, [selectedCategory, stats, selectedUserId]);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await taskService.getUsers();
+      setUsers(response.data || []);
+      // İlk kullanıcıyı varsayılan olarak seç
+      if (response.data && response.data.length > 0) {
+        setSelectedUserId(response.data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchStats = async () => {
     try {
-      const response = await taskService.getStats();
+      const params = isAdmin && selectedUserId ? { user_id: selectedUserId } : {};
+      const response = await taskService.getStats(params);
       setStats(response.data);
       setLoading(false);
     } catch (error) {
@@ -72,7 +97,12 @@ const Stats = () => {
     try {
       const response = await taskService.getTasks();
       const tasks = response.data.results || response.data;
-      const filteredTasks = tasks.filter(task => task.category === selectedCategory);
+      // Admin seçili kullanıcı için filtrele
+      let filteredTasks = tasks;
+      if (isAdmin && selectedUserId) {
+        filteredTasks = tasks.filter(task => task.user === parseInt(selectedUserId) || task.user_id === parseInt(selectedUserId));
+      }
+      filteredTasks = filteredTasks.filter(task => task.category === selectedCategory);
       setCategoryTasks(filteredTasks);
     } catch (error) {
       console.error('Error fetching category tasks:', error);
@@ -130,7 +160,7 @@ const Stats = () => {
     );
   }
 
-  // Chart data for task status distribution
+  // Görev durumu dağılımı için grafik verisi
   const statusData = {
     labels: ['Bekleyen', 'Devam Ediyor', 'Tamamlanan', 'İptal Edilmiş'],
     datasets: [
@@ -153,7 +183,7 @@ const Stats = () => {
     ],
   };
 
-  // Chart data for priority distribution
+  // Öncelik dağılımı için grafik verisi
   const priorityData = {
     labels: ['Düşük', 'Orta', 'Yüksek', 'Acil'],
     datasets: [
@@ -182,7 +212,7 @@ const Stats = () => {
     ],
   };
 
-  // Chart data for category distribution
+  // Kategori dağılımı için grafik verisi
   const categoryData = {
     labels: stats.category_stats.map(cat => {
       const categoryNames = {
@@ -235,12 +265,42 @@ const Stats = () => {
     },
   };
 
+  const selectedUser = isAdmin && selectedUserId
+    ? users.find(u => u.id === parseInt(selectedUserId))
+    : null;
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">İstatistikler</h1>
-        <p className="text-gray-600">Görev performansınızı analiz edin</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">İstatistikler</h1>
+            <p className="text-gray-600">
+              {isAdmin && selectedUser
+                ? `${selectedUser.first_name || ''} ${selectedUser.last_name || ''} (${selectedUser.username}) - Görev performansını analiz edin`
+                : 'Görev performansınızı analiz edin'}
+            </p>
+          </div>
+
+          {/* Admin: User Selection */}
+          {isAdmin && users.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <User className="h-5 w-5 text-gray-500" />
+              <select
+                value={selectedUserId || ''}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+              >
+                {users.map(userItem => (
+                  <option key={userItem.id} value={userItem.id}>
+                    {userItem.first_name || ''} {userItem.last_name || ''} ({userItem.username})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Overview Cards */}

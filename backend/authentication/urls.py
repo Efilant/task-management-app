@@ -1,5 +1,5 @@
 """
-Authentication URLs.
+Kimlik doğrulama URL'leri.
 """
 
 from django.urls import path

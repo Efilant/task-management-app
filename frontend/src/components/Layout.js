@@ -6,12 +6,13 @@ import {
   BarChart3,
   LogOut,
   User,
-  ChevronDown
+  ChevronDown,
+  Shield
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 const Layout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -20,13 +21,14 @@ const Layout = () => {
     { name: 'Görev Yönetim Merkezi', href: '/dashboard', icon: Home },
     { name: 'İstatistikler', href: '/stats', icon: BarChart3 },
     { name: 'Profil', href: '/profile', icon: User },
+    ...(isAdmin ? [{ name: 'Admin Paneli', href: '/admin', icon: Shield }] : []),
   ];
 
   const handleLogout = async () => {
     await logout();
   };
 
-  // Close dropdown when clicking outside
+  // Dışarı tıklandığında dropdown'ı kapat
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {

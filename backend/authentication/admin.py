@@ -8,7 +8,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'Profil Bilgileri'
-    fields = ('verification_token', 'verification_token_sent_at', 'reset_token', 'reset_token_expires')
+    fields = ('role', 'verification_token', 'verification_token_sent_at', 'reset_token', 'reset_token_expires')
     readonly_fields = ('verification_token_sent_at', 'reset_token_expires')
 
 # User modelini genişlet
@@ -26,10 +26,11 @@ admin.site.register(User, CustomUserAdmin)
 # UserProfile için ayrı admin
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'verification_token', 'verification_token_sent_at', 'reset_token', 'reset_token_expires')
-    list_filter = ('verification_token_sent_at', 'reset_token_expires')
+    list_display = ('user', 'role', 'verification_token', 'verification_token_sent_at', 'reset_token', 'reset_token_expires')
+    list_filter = ('role', 'verification_token_sent_at', 'reset_token_expires')
     search_fields = ('user__username', 'user__email')
     readonly_fields = ('verification_token_sent_at', 'reset_token_expires')
+    fields = ('user', 'role', 'verification_token', 'verification_token_sent_at', 'reset_token', 'reset_token_expires', 'email_verified')
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('user')

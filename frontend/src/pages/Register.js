@@ -53,7 +53,7 @@ const Register = () => {
       [name]: value,
     });
 
-    // Validate password in real-time
+    // Şifreyi gerçek zamanlı doğrula
     if (name === 'password') {
       const errors = validatePassword(value);
       setPasswordErrors(errors);

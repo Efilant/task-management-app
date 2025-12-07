@@ -14,7 +14,7 @@ const ResetPassword = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [passwordErrors, setPasswordErrors] = useState([]);
-    const [status, setStatus] = useState('form'); // form, success, error
+    const [status, setStatus] = useState('form'); // form, success, error durumları
     const [message, setMessage] = useState('');
     const token = searchParams.get('token');
 
@@ -51,7 +51,7 @@ const ResetPassword = () => {
             [name]: value,
         });
 
-        // Validate password in real-time
+        // Şifreyi gerçek zamanlı doğrula
         if (name === 'new_password') {
             const errors = validatePassword(value);
             setPasswordErrors(errors);

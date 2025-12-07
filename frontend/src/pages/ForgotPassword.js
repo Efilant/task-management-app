@@ -19,7 +19,7 @@ const ForgotPassword = () => {
             setEmailSent(true);
             toast.success('Şifre sıfırlama kodu e-posta adresinize gönderildi.');
 
-            // 2 saniye sonra PasswordReset sayfasına yönlendir
+            // 2 saniye sonra şifre sıfırlama sayfasına yönlendir
             setTimeout(() => {
                 navigate(`/reset-password?email=${encodeURIComponent(email)}`);
             }, 2000);

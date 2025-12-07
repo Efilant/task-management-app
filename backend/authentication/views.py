@@ -1,5 +1,5 @@
 """
-Authentication views for user registration and login.
+Kullanıcı kaydı ve giriş için kimlik doğrulama view'ları.
 """
 
 from rest_framework import status
@@ -20,7 +20,7 @@ import re
 
 def validate_password_strength(password):
     """
-    Validate password strength.
+    Şifre gücünü doğrula.
     """
     errors = []
     
@@ -43,7 +43,7 @@ def validate_password_strength(password):
 
 def validate_email(email):
     """
-    Validate email format.
+    E-posta formatını doğrula.
     """
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
@@ -52,7 +52,7 @@ def validate_email(email):
 @permission_classes([AllowAny])
 def register(request):
     """
-    Register a new user with optional email verification.
+    İsteğe bağlı e-posta doğrulaması ile yeni bir kullanıcı kaydet.
     """
     username = request.data.get('username')
     email = request.data.get('email')
@@ -79,7 +79,7 @@ def register(request):
             'details': password_errors
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Check if username or email already exists
+    # Kullanıcı adı veya e-posta zaten mevcut mu kontrol et
     if User.objects.filter(username=username).exists():
         return Response({
             'error': 'Bu kullanıcı adı zaten kullanılıyor'
@@ -91,7 +91,7 @@ def register(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        # Create user
+        # Kullanıcı oluştur
         user = User.objects.create_user(
             username=username,
             email=email,
@@ -108,7 +108,7 @@ def register(request):
         user.profile.verification_token_sent_at = timezone.now()
         user.profile.save()
         
-        # Send verification email with code
+        # Kod ile doğrulama e-postası gönder
         try:
             send_mail(
                 'E-posta Doğrulama Kodu',
@@ -147,7 +147,7 @@ def register(request):
 @permission_classes([AllowAny])
 def verify_email(request):
     """
-    Verify user email with 6-digit code.
+    6 haneli kod ile kullanıcı e-postasını doğrula.
     """
     code = request.data.get('code')
     email = request.data.get('email')
@@ -167,7 +167,7 @@ def verify_email(request):
         print(f"DEBUG: Gelen kod: {code}")
         print(f"DEBUG: Gelen email: {email}")
         
-        # Find user by email and verification code
+        # E-posta ve doğrulama kodu ile kullanıcıyı bul
         user = User.objects.get(email=email, profile__verification_token=code)
         print(f"DEBUG: Kullanıcı bulundu: {user.username}")
         
@@ -176,11 +176,11 @@ def verify_email(request):
                 'message': 'E-posta adresi zaten doğrulanmış'
             }, status=status.HTTP_200_OK)
         
-        # Activate user
+        # Kullanıcıyı aktifleştir
         user.is_active = True
         user.save()
         
-        # Clear verification code
+        # Doğrulama kodunu temizle
         user.profile.verification_token = None
         user.profile.save()
         
@@ -204,7 +204,7 @@ def verify_email(request):
 @permission_classes([AllowAny])
 def resend_verification_code(request):
     """
-    Resend verification code for email verification.
+    E-posta doğrulaması için doğrulama kodunu yeniden gönder.
     """
     email = request.data.get('email')
     
@@ -216,20 +216,20 @@ def resend_verification_code(request):
     try:
         user = User.objects.get(email=email)
         
-        # Check if user is already active
+        # Kullanıcının zaten aktif olup olmadığını kontrol et
         if user.is_active:
             return Response({
                 'error': 'Bu e-posta adresi zaten doğrulanmış'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Generate new verification code
+        # Yeni doğrulama kodu oluştur
         import random
         verification_code = str(random.randint(100000, 999999))  # 6 haneli kod
         user.profile.verification_token = verification_code
         user.profile.verification_token_sent_at = timezone.now()
         user.profile.save()
         
-        # Send verification email with new code
+        # Yeni kod ile doğrulama e-postası gönder
         try:
             send_mail(
                 'E-posta Doğrulama Kodu (Yeniden)',
@@ -264,7 +264,7 @@ def resend_verification_code(request):
 @permission_classes([AllowAny])
 def request_password_reset(request):
     """
-    Request password reset email.
+    Şifre sıfırlama e-postası iste.
     """
     print("DEBUG: request_password_reset fonksiyonu çağrıldı")
     email = request.data.get('email')
@@ -286,17 +286,17 @@ def request_password_reset(request):
         user = User.objects.get(email=email)
         print(f"DEBUG: Şifre sıfırlama isteği - email: {email}")
         
-        # Generate 6-digit reset code
+        # 6 haneli sıfırlama kodu oluştur
         import random
         reset_code = str(random.randint(100000, 999999))  # 6 haneli kod
         print(f"DEBUG: Üretilen sıfırlama kodu: {reset_code}")
         
-        # Store reset code
+        # Sıfırlama kodunu kaydet
         user.profile.reset_token = reset_code
         user.profile.reset_token_expires = timezone.now() + timedelta(minutes=3)  # 3 dakika geçerli
         user.profile.save()
         
-        # Send reset email with code
+        # Kod ile sıfırlama e-postası gönder
         send_mail(
             'Şifre Sıfırlama Kodu',
             f'Şifrenizi sıfırlamak için aşağıdaki kodu kullanın:\n\n'
@@ -315,7 +315,7 @@ def request_password_reset(request):
         
     except User.DoesNotExist:
         print(f"DEBUG: E-posta adresi bulunamadı: {email}")
-        # Don't reveal if email exists or not for security
+        # Güvenlik için e-postanın var olup olmadığını açığa çıkarma
         return Response({
             'message': 'E-posta adresi kayıtlıysa, şifre sıfırlama bağlantısı gönderilecektir.'
         }, status=status.HTTP_200_OK)
@@ -328,7 +328,7 @@ def request_password_reset(request):
 @permission_classes([AllowAny])
 def reset_password(request):
     """
-    Reset password with 6-digit code.
+    6 haneli kod ile şifreyi sıfırla.
     """
     code = request.data.get('code')
     email = request.data.get('email')
@@ -357,11 +357,11 @@ def reset_password(request):
         )
         print(f"DEBUG: Kullanıcı bulundu: {user.username}")
         
-        # Set new password
+        # Yeni şifreyi ayarla
         user.set_password(new_password)
         user.save()
         
-        # Clear reset token
+        # Sıfırlama token'ını temizle
         user.profile.reset_token = None
         user.profile.reset_token_expires = None
         user.profile.save()
@@ -386,7 +386,7 @@ def reset_password(request):
 @permission_classes([AllowAny])
 def login(request):
     """
-    Authenticate user and return JWT tokens.
+    Kullanıcıyı kimlik doğrula ve JWT token'larını döndür.
     """
     print("DEBUG: login fonksiyonu çağrıldı")
     username = request.data.get('username')
@@ -410,9 +410,9 @@ def login(request):
             # Şifreyi manuel olarak kontrol et
             if user.check_password(password):
                 print(f"DEBUG: User bulundu (manuel kontrol): {user.username}, is_active: {user.is_active}")
-                # Check if email is verified
+                # E-postanın doğrulanıp doğrulanmadığını kontrol et
                 if not user.is_active:
-                    # Check if verification code exists and is still valid
+                    # Doğrulama kodunun var olup olmadığını ve hala geçerli olup olmadığını kontrol et
                     verification_code = user.profile.verification_token
                     code_expired = not user.profile.is_verification_token_valid()
                     
@@ -435,9 +435,9 @@ def login(request):
             }, status=status.HTTP_401_UNAUTHORIZED)
     else:
         print(f"DEBUG: User bulundu: {user.username}, is_active: {user.is_active}")
-        # Check if email is verified
+        # E-postanın doğrulanıp doğrulanmadığını kontrol et
         if not user.is_active:
-            # Check if verification code exists and is still valid
+            # Doğrulama kodunun var olup olmadığını ve hala geçerli olup olmadığını kontrol et
             verification_code = user.profile.verification_token
             code_expired = not user.profile.is_verification_token_valid()
             
@@ -449,8 +449,11 @@ def login(request):
                 'has_verification_code': bool(verification_code)
             }, status=status.HTTP_401_UNAUTHORIZED)
         
-        # Generate JWT tokens
+        # JWT token'ları oluştur
         refresh = RefreshToken.for_user(user)
+        
+        # Kullanıcı rolünü al
+        user_role = user.profile.role if hasattr(user, 'profile') else 'user'
         
         return Response({
             'message': 'Login successful',
@@ -460,6 +463,7 @@ def login(request):
                 'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
+                'role': user_role,
             },
             'tokens': {
                 'access': str(refresh.access_token),
@@ -471,7 +475,7 @@ def login(request):
 @permission_classes([AllowAny])
 def refresh_token(request):
     """
-    Refresh JWT access token using refresh token.
+    Refresh token kullanarak JWT access token'ı yenile.
     """
     refresh_token = request.data.get('refresh')
     
@@ -496,7 +500,7 @@ def refresh_token(request):
 @api_view(['POST'])
 def logout(request):
     """
-    Logout user (token will expire naturally).
+    Kullanıcıyı çıkış yaptır (token doğal olarak süresi dolacak).
     """
     try:
         return Response({
@@ -512,7 +516,7 @@ def logout(request):
 @permission_classes([IsAuthenticated])
 def profile(request):
     """
-    Get or update user profile information.
+    Kullanıcı profil bilgilerini al veya güncelle.
     """
     print(f"DEBUG: profile endpoint çağrıldı - Method: {request.method}")
     print(f"DEBUG: User: {request.user.username if request.user else 'Anonymous'}")
@@ -520,6 +524,9 @@ def profile(request):
     
     if request.method == 'GET':
         print(f"DEBUG: Profile GET - User: {user.username}, Email: {user.email}")
+        # Kullanıcı rolünü al
+        user_role = user.profile.role if hasattr(user, 'profile') else 'user'
+        
         return Response({
             'id': user.id,
             'username': user.username,
@@ -528,22 +535,23 @@ def profile(request):
             'last_name': user.last_name,
             'is_active': user.is_active,
             'date_joined': user.date_joined,
+            'role': user_role,
         }, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        # Update profile
+        # Profili güncelle
         username = request.data.get('username')
         email = request.data.get('email')
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
         
-        # Validate email format if provided
+        # Sağlanmışsa e-posta formatını doğrula
         if email and not validate_email(email):
             return Response({
                 'error': 'Geçersiz e-posta formatı'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if username is already taken by another user
+        # Kullanıcı adının başka bir kullanıcı tarafından alınıp alınmadığını kontrol et
         if username and username != user.username:
             if User.objects.filter(username=username).exists():
                 return Response({
@@ -558,7 +566,7 @@ def profile(request):
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            # Update user fields
+            # Kullanıcı alanlarını güncelle
             if username:
                 user.username = username
             if email:
@@ -591,7 +599,7 @@ def profile(request):
 @permission_classes([IsAuthenticated])
 def change_password(request):
     """
-    Change user password.
+    Kullanıcı şifresini değiştir.
     """
     user = request.user
     current_password = request.data.get('current_password')
@@ -602,13 +610,13 @@ def change_password(request):
             'error': 'Mevcut şifre ve yeni şifre gerekli'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Verify current password
+    # Mevcut şifreyi doğrula
     if not user.check_password(current_password):
         return Response({
             'error': 'Mevcut şifre yanlış'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Validate new password strength
+    # Yeni şifre gücünü doğrula
     password_errors = validate_password_strength(new_password)
     if password_errors:
         return Response({

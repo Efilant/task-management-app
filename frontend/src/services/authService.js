@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-// Create axios instance
+// Axios instance oluştur
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -11,7 +11,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Kimlik doğrulama token'ını eklemek için istek interceptor'ı
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
@@ -25,7 +25,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Token yenilemeyi işlemek için yanıt interceptor'ı
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -44,12 +44,12 @@ api.interceptors.response.use(
           const { access } = response.data;
           localStorage.setItem('access_token', access);
 
-          // Retry the original request with new token
+          // Yeni token ile orijinal isteği yeniden dene
           originalRequest.headers.Authorization = `Bearer ${access}`;
           return api(originalRequest);
         }
       } catch (refreshError) {
-        // Refresh failed, redirect to login
+        // Yenileme başarısız, giriş sayfasına yönlendir
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
@@ -139,7 +139,7 @@ export const authService = {
     }
   },
 
-  // Profile management
+  // Profil yönetimi
   getProfile: async () => {
     try {
       console.log('DEBUG: getProfile çağrıldı');
@@ -220,11 +220,45 @@ export const taskService = {
 
   createTask: async (taskData) => {
     try {
+      console.log('createTask - Sending data:', JSON.stringify(taskData, null, 2));
       const response = await api.post('/tasks/', taskData);
+      console.log('createTask - Success response:', response);
       toast.success('Görev başarıyla oluşturuldu!');
       return response;
     } catch (error) {
-      const message = error.response?.data?.error || 'Görev oluşturulurken bir hata oluştu';
+      console.error('createTask - Error:', error);
+      console.error('createTask - Error response:', error.response?.data);
+      console.error('createTask - Error status:', error.response?.status);
+
+      // Detaylı hata mesajı
+      let message = 'Görev oluşturulurken bir hata oluştu';
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.error) {
+          message = errorData.error;
+        } else if (errorData.detail) {
+          message = errorData.detail;
+        } else if (typeof errorData === 'string') {
+          message = errorData;
+        } else if (Array.isArray(errorData)) {
+          message = errorData.join(', ');
+        } else {
+          // Field errors
+          const fieldErrors = [];
+          Object.keys(errorData).forEach(key => {
+            if (Array.isArray(errorData[key])) {
+              fieldErrors.push(`${key}: ${errorData[key].join(', ')}`);
+            } else if (typeof errorData[key] === 'string') {
+              fieldErrors.push(`${key}: ${errorData[key]}`);
+            } else {
+              fieldErrors.push(`${key}: ${JSON.stringify(errorData[key])}`);
+            }
+          });
+          if (fieldErrors.length > 0) {
+            message = fieldErrors.join(' | ');
+          }
+        }
+      }
       toast.error(message);
       throw error;
     }
@@ -277,9 +311,9 @@ export const taskService = {
     }
   },
 
-  getStats: async () => {
+  getStats: async (params = {}) => {
     try {
-      const response = await api.get('/tasks/stats/');
+      const response = await api.get('/tasks/stats/', { params });
       return response;
     } catch (error) {
       const message = error.response?.data?.error || 'İstatistikler yüklenirken bir hata oluştu';
@@ -310,6 +344,191 @@ export const taskService = {
     }
   },
 
+  // Admin fonksiyonları
+  getAllTasks: async () => {
+    try {
+      const response = await api.get('/tasks/all_tasks/');
+      return response;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Tüm görevler yüklenirken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
+
+  getUsers: async () => {
+    try {
+      const response = await api.get('/tasks/users/');
+      return response;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Kullanıcılar yüklenirken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
+
+  assignTask: async (taskId, userId) => {
+    try {
+      const response = await api.patch(`/tasks/${taskId}/assign/`, { user_id: userId });
+      toast.success('Görev başarıyla atandı!');
+      return response;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Görev atanırken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
+
+};
+
+export const attachmentService = {
+  uploadAttachment: async (taskId, file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      // Görev ID'sinin tam sayı olarak gönderildiğinden emin ol
+      formData.append('task', parseInt(taskId, 10));
+
+      console.log('Uploading file:', file.name, 'to task:', taskId);
+
+      const response = await api.post('/tasks/attachments/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      toast.success(`${file.name} başarıyla yüklendi!`);
+      return response;
+    } catch (error) {
+      console.error('Upload error:', error);
+      console.error('Error response:', error.response?.data);
+
+      let message = 'Dosya yüklenirken bir hata oluştu';
+      if (error.response?.data) {
+        // İç içe hata mesajlarını kontrol et
+        if (error.response.data.file) {
+          message = Array.isArray(error.response.data.file)
+            ? error.response.data.file[0]
+            : error.response.data.file;
+        } else if (error.response.data.task) {
+          message = Array.isArray(error.response.data.task)
+            ? error.response.data.task[0]
+            : error.response.data.task;
+        } else if (error.response.data.error) {
+          message = error.response.data.error;
+        } else if (error.response.data.detail) {
+          message = error.response.data.detail;
+        } else if (typeof error.response.data === 'string') {
+          message = error.response.data;
+        } else if (error.response.data.non_field_errors) {
+          message = Array.isArray(error.response.data.non_field_errors)
+            ? error.response.data.non_field_errors[0]
+            : error.response.data.non_field_errors;
+        }
+      } else if (error.message) {
+        message = error.message;
+      }
+
+      toast.error(`${file.name}: ${message}`);
+      throw error;
+    }
+  },
+
+  getAttachments: async (taskId) => {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('getAttachments - Fetching for task:', taskId);
+      }
+      const response = await api.get(`/tasks/attachments/by_task/?task_id=${taskId}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('getAttachments - Response:', response);
+        console.log('getAttachments - Response data:', response.data);
+      }
+      return response;
+    } catch (error) {
+      console.error('getAttachments - Error:', error);
+      if (error.response?.status !== 404) {
+        console.error('getAttachments - Error response:', error.response?.data);
+        const message = error.response?.data?.error || 'Dosyalar yüklenirken bir hata oluştu';
+        toast.error(message);
+      }
+      throw error;
+    }
+  },
+
+  downloadAttachment: async (attachmentId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/tasks/attachments/${attachmentId}/download/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Dosya indirilemedi');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Content-Disposition başlığından dosya adını al
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `attachment_${attachmentId}`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Dosya indirildi!');
+    } catch (error) {
+      toast.error('Dosya indirilemedi');
+      throw error;
+    }
+  },
+
+  previewAttachment: async (attachmentId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${API_BASE_URL}/tasks/attachments/${attachmentId}/preview/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Dosya görüntülenemedi');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error) {
+      toast.error('Dosya görüntülenemedi');
+      throw error;
+    }
+  },
+
+  deleteAttachment: async (attachmentId) => {
+    try {
+      await api.delete(`/tasks/attachments/${attachmentId}/`);
+      toast.success('Dosya başarıyla silindi!');
+    } catch (error) {
+      const message = error.response?.data?.error || 'Dosya silinirken bir hata oluştu';
+      toast.error(message);
+      throw error;
+    }
+  },
 };
 
 export default api;

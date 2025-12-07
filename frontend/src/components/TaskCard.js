@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Calendar,
   Clock,
@@ -8,12 +8,33 @@ import {
   Circle,
   AlertCircle,
   PlayCircle,
-  X
+  X,
+  Paperclip,
+  Download,
+  Eye,
+  User,
 } from 'lucide-react';
 import { format, isAfter, isBefore, addDays, differenceInHours, differenceInDays } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { attachmentService } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 
 const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
+  const { isAdmin } = useAuth();
+
+  // Hata ayıklama: Eklentileri logla
+  useEffect(() => {
+    if (task) {
+      console.log('TaskCard - Task ID:', task.id, 'Title:', task.title);
+      console.log('TaskCard - Attachments:', task.attachments);
+      console.log('TaskCard - Attachments type:', typeof task.attachments);
+      console.log('TaskCard - Is array:', Array.isArray(task.attachments));
+      if (task.attachments) {
+        console.log('TaskCard - Attachments length:', task.attachments.length);
+      }
+    }
+  }, [task]);
+
   // Güvenli tarih formatlaması fonksiyonu
   const safeFormatDate = (dateString, formatString, options = {}) => {
     try {
@@ -382,6 +403,13 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
             }`}>
             {task.title}
           </h3>
+          {/* Admin için görev sahibi bilgisi */}
+          {isAdmin && (task.user_username || task.user_email) && (
+            <div className="flex items-center text-xs text-gray-500 mb-2">
+              <User className="h-3 w-3 mr-1" />
+              <span>{task.user_username || task.user_email}</span>
+            </div>
+          )}
           {task.description && (
             <p className="text-gray-600 text-sm mb-3 line-clamp-2">
               {task.description}
@@ -485,8 +513,79 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
         </div>
       )}
 
+      {/* Attachments */}
+      {(() => {
+        // Hata ayıklama: Sorun giderme için eklentileri logla
+        if (task.id && process.env.NODE_ENV === 'development') {
+          console.log(`[TaskCard ${task.id}] Attachments check:`, {
+            hasAttachments: !!task.attachments,
+            isArray: Array.isArray(task.attachments),
+            length: task.attachments?.length || 0,
+            type: typeof task.attachments,
+            attachments: task.attachments
+          });
+        }
+        return null;
+      })()}
+      {task.attachments && Array.isArray(task.attachments) && task.attachments.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center mb-2">
+            <Paperclip className="h-4 w-4 text-gray-500 mr-2" />
+            <span className="text-xs font-medium text-gray-700">
+              📎 Ekler ({task.attachments.length})
+            </span>
+          </div>
+          <div className="space-y-1">
+            {task.attachments.slice(0, 3).map((attachment) => (
+              <div
+                key={attachment.id || attachment.original_filename}
+                className="flex items-center justify-between bg-blue-50 p-2 rounded text-xs hover:bg-blue-100 transition-colors border border-blue-200"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-gray-800 truncate font-medium" title={attachment.original_filename}>
+                    📄 {attachment.original_filename}
+                  </p>
+                  <p className="text-gray-600 text-xs mt-0.5">
+                    {attachment.file_size_mb || (attachment.file_size ? (attachment.file_size / (1024 * 1024)).toFixed(2) : '0')} MB • {safeFormatDate(attachment.uploaded_at, 'dd.MM.yyyy', { locale: tr })}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-1 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      attachmentService.downloadAttachment(attachment.id);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-200 rounded transition-colors"
+                    title="İndir"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                  {(attachment.original_filename && attachment.original_filename.match(/\.(pdf|png|jpg|jpeg)$/i)) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        attachmentService.previewAttachment(attachment.id);
+                      }}
+                      className="text-green-600 hover:text-green-800 p-1 hover:bg-green-200 rounded transition-colors"
+                      title="Önizle"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {task.attachments.length > 3 && (
+              <p className="text-xs text-gray-500 text-center pt-1">
+                +{task.attachments.length - 3} daha fazla dosya
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Created Date */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-gray-500 mt-4">
         Oluşturulma: {safeFormatDate(task.created_at, 'dd MMMM yyyy', { locale: tr })}
       </div>
     </div>

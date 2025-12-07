@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Stats from './pages/Stats';
 import Profile from './pages/Profile';
+import AdminPanel from './pages/AdminPanel';
 import Layout from './components/Layout';
 import VerifyEmail from './pages/VerifyEmail';
 import PasswordReset from './pages/PasswordReset';
@@ -36,6 +37,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="stats" element={<Stats />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="admin" element={<AdminPanel />} />
             </Route>
           </Routes>
           <Toaster

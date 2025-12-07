@@ -18,7 +18,7 @@ const PasswordReset = () => {
     const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        // URL'den email parametresini al
+        // URL'den e-posta parametresini al
         const emailParam = searchParams.get('email');
         if (emailParam) {
             setEmail(emailParam);
@@ -78,7 +78,7 @@ const PasswordReset = () => {
     };
 
     const handleCodeChange = (e) => {
-        const value = e.target.value.replace(/\D/g, ''); // Sadece rakam
+        const value = e.target.value.replace(/\D/g, ''); // Sadece rakamları al
         if (value.length <= 6) {
             setCode(value);
         }
