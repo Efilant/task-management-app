@@ -1,5 +1,5 @@
 """
-URL configuration for taskmanager_project project.
+taskmanager_project için URL yapılandırması.
 """
 from django.contrib import admin
 from django.urls import path, include

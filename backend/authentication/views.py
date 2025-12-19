@@ -67,13 +67,13 @@ def register(request):
             'error': 'Username, email and password are required'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Validate email format
+    # E-posta formatını doğrula
     if not validate_email(email):
         return Response({
             'error': 'Geçersiz e-posta formatı'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Validate password strength
+    # Şifre gücünü doğrula
     password_errors = validate_password_strength(password)
     if password_errors:
         return Response({
@@ -105,10 +105,25 @@ def register(request):
         
         # E-posta doğrulama ile kayıt - 6 haneli kod sistemi
         import random
+        import sys
         verification_code = str(random.randint(100000, 999999))  # 6 haneli kod
         user.profile.verification_token = verification_code
         user.profile.verification_token_sent_at = timezone.now()
         user.profile.save()
+        
+        # Doğrulama kodunu terminalde göster
+        sys.stdout.write("\n\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("  EMAIL DOGRULAMA KODU\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write(f"  Email: {email}\n")
+        sys.stdout.write(f"  KOD: {verification_code}\n")
+        sys.stdout.write("  Bu kod 3 dakika gecerlidir.\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("\n\n")
+        sys.stdout.flush()
         
         # Kod ile doğrulama e-postası gönder
         try:
@@ -123,8 +138,11 @@ def register(request):
                 fail_silently=False,
             )
             email_sent = True
+            print(f"[OK] Email basariyla gonderildi: {email}", flush=True)
         except Exception as email_error:
-            print(f"E-posta gönderme hatası: {email_error}")
+            error_msg = str(email_error).encode('ascii', 'ignore').decode('ascii')
+            print(f"[HATA] E-posta gonderme hatasi: {error_msg}", flush=True)
+            print(f"[UYARI] Kod terminalde goruntuleniyor (yukarida)", flush=True)
             email_sent = False
         
         return Response({
@@ -165,7 +183,7 @@ def verify_email(request):
         }, status=status.HTTP_400_BAD_REQUEST)
     
     try:
-        # Debug: Gelen verileri yazdır
+        # Hata ayıklama: Gelen verileri yazdır
         print(f"DEBUG: Gelen kod: {code}")
         print(f"DEBUG: Gelen email: {email}")
         
@@ -226,10 +244,25 @@ def resend_verification_code(request):
         
         # Yeni doğrulama kodu oluştur
         import random
+        import sys
         verification_code = str(random.randint(100000, 999999))  # 6 haneli kod
         user.profile.verification_token = verification_code
         user.profile.verification_token_sent_at = timezone.now()
         user.profile.save()
+        
+        # Yeni doğrulama kodunu terminalde göster
+        sys.stdout.write("\n\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("  YENI EMAIL DOGRULAMA KODU\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write(f"  Email: {email}\n")
+        sys.stdout.write(f"  KOD: {verification_code}\n")
+        sys.stdout.write("  Bu kod 3 dakika gecerlidir.\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("\n\n")
+        sys.stdout.flush()
         
         # Yeni kod ile doğrulama e-postası gönder
         try:
@@ -244,8 +277,11 @@ def resend_verification_code(request):
                 fail_silently=False,
             )
             email_sent = True
+            print(f"[OK] Email basariyla gonderildi: {email}", flush=True)
         except Exception as email_error:
-            print(f"E-posta gönderme hatası: {email_error}")
+            error_msg = str(email_error).encode('ascii', 'ignore').decode('ascii')
+            print(f"[HATA] E-posta gonderme hatasi: {error_msg}", flush=True)
+            print(f"[UYARI] Kod terminalde goruntuleniyor (yukarida)", flush=True)
             email_sent = False
         
         return Response({
@@ -290,26 +326,45 @@ def request_password_reset(request):
         
         # 6 haneli sıfırlama kodu oluştur
         import random
+        import sys
         reset_code = str(random.randint(100000, 999999))  # 6 haneli kod
-        print(f"DEBUG: Üretilen sıfırlama kodu: {reset_code}")
         
         # Sıfırlama kodunu kaydet
         user.profile.reset_token = reset_code
         user.profile.reset_token_expires = timezone.now() + timedelta(minutes=3)  # 3 dakika geçerli
         user.profile.save()
         
+        # Sıfırlama kodunu terminalde göster
+        sys.stdout.write("\n\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("  SIFRE SIFIRLAMA KODU\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write(f"  Email: {email}\n")
+        sys.stdout.write(f"  KOD: {reset_code}\n")
+        sys.stdout.write("  Bu kod 3 dakika gecerlidir.\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("=" * 70 + "\n")
+        sys.stdout.write("\n\n")
+        sys.stdout.flush()
+        
         # Kod ile sıfırlama e-postası gönder
-        send_mail(
-            'Şifre Sıfırlama Kodu',
-            f'Şifrenizi sıfırlamak için aşağıdaki kodu kullanın:\n\n'
-            f'Sıfırlama Kodu: {reset_code}\n\n'
-            f'Bu kod 3 dakika geçerlidir.\n'
-            f'Kodu uygulamada ilgili alana girin.',
-            settings.DEFAULT_FROM_EMAIL,
-            [email],
-            fail_silently=False,
-        )
-        print(f"DEBUG: Şifre sıfırlama e-postası gönderildi: {email}")
+        try:
+            send_mail(
+                'Şifre Sıfırlama Kodu',
+                f'Şifrenizi sıfırlamak için aşağıdaki kodu kullanın:\n\n'
+                f'Sıfırlama Kodu: {reset_code}\n\n'
+                f'Bu kod 3 dakika geçerlidir.\n'
+                f'Kodu uygulamada ilgili alana girin.',
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+            )
+            print(f"[OK] Email basariyla gonderildi: {email}", flush=True)
+        except Exception as email_error:
+            error_msg = str(email_error).encode('ascii', 'ignore').decode('ascii')
+            print(f"[HATA] E-posta gonderme hatasi: {error_msg}", flush=True)
+            print(f"[UYARI] Kod terminalde goruntuleniyor (yukarida)", flush=True)
         
         return Response({
             'message': 'Şifre sıfırlama kodu e-posta adresinize gönderildi.'
@@ -341,7 +396,7 @@ def reset_password(request):
             'error': 'Kod, e-posta adresi ve yeni şifre gerekli'
         }, status=status.HTTP_400_BAD_REQUEST)
     
-    # Validate password strength
+    # Şifre gücünü doğrula
     password_errors = validate_password_strength(new_password)
     if password_errors:
         return Response({

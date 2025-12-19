@@ -22,8 +22,7 @@ Modern, full-stack task management application built with Django REST Framework 
 - **Django 4.2.7** - Web framework
 - **Django REST Framework 3.14.0** - API framework
 - **Django REST Framework Simple JWT 5.3.0** - JWT authentication
-- **PostgreSQL** - Database
-- **psycopg2-binary 2.9.7** - PostgreSQL adapter
+- **SQLite 3** - Database (no setup required)
 - **django-cors-headers 4.3.1** - CORS handling
 - **django-filter 23.3** - API filtering
 
@@ -69,8 +68,9 @@ task-management-app/
 
 - Python 3.8+
 - Node.js 16+
-- PostgreSQL 12+
 - npm or yarn
+
+**Note:** SQLite is used as the database, which requires no additional setup or installation.
 
 ### Backend Setup
 
@@ -90,31 +90,26 @@ task-management-app/
    pip install -r requirements.txt
    ```
 
-4. **Set up environment variables:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your database credentials
-   ```
-
-5. **Set up PostgreSQL database:**
-   ```sql
-   CREATE DATABASE taskmanager_db;
-   CREATE USER postgres WITH PASSWORD 'password';
-   GRANT ALL PRIVILEGES ON DATABASE taskmanager_db TO postgres;
-   ```
-
-6. **Run migrations:**
+4. **Run migrations:**
    ```bash
    python manage.py makemigrations
    python manage.py migrate
    ```
+   
+   **Note:** SQLite database (`db.sqlite3`) will be automatically created in the backend directory.
 
-7. **Create superuser:**
+5. **Set up environment variables (optional):**
+   ```bash
+   cp .env.example .env
+   # Edit .env if needed (SQLite doesn't require database credentials)
+   ```
+
+6. **Create superuser:**
    ```bash
    python manage.py createsuperuser
    ```
 
-8. **Start development server:**
+7. **Start development server:**
    ```bash
    python manage.py runserver
    ```
@@ -204,7 +199,7 @@ The frontend will be available at `http://localhost:3000`
 
 Key settings in `backend/taskmanager_project/settings.py`:
 
-- Database configuration
+- Database configuration (SQLite by default, PostgreSQL available for production)
 - JWT token settings
 - CORS settings
 - Pagination settings
@@ -236,10 +231,12 @@ npm test
 ### Backend Deployment
 
 1. Set `DEBUG=False` in production
-2. Configure production database
+2. Configure production database (consider PostgreSQL for production)
 3. Set up static file serving
 4. Configure CORS for production domain
 5. Use environment variables for sensitive data
+
+**Note:** For production, it's recommended to use PostgreSQL instead of SQLite for better performance and concurrent access.
 
 ### Frontend Deployment
 

@@ -38,7 +38,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Task.objects.filter(user=self.request.user).prefetch_related('attachments')
     
     def get_serializer_class(self):
-        """Use different serializer for create action"""
+        """Oluşturma işlemi için farklı serializer kullan"""
         if self.action == 'create':
             return TaskCreateSerializer
         return TaskSerializer
