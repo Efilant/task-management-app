@@ -2,6 +2,11 @@
 
 Modern, full-stack task management application built with Django REST Framework (Backend) and React.js (Frontend).
 
+## 🌿 Branches
+
+- **`main`**: PostgreSQL version (recommended for Mac/Linux users)
+- **`windows-sqlite`**: SQLite version (recommended for Windows users, no database setup required)
+
 ## 🚀 Features
 
 - **User Authentication**: JWT-based authentication with registration and login
@@ -64,13 +69,36 @@ task-management-app/
 
 ## 🚀 Getting Started
 
+### Branch Selection
+
+This project has two branches for different operating systems:
+
+- **`main` branch**: Uses PostgreSQL (recommended for Mac/Linux users)
+- **`windows-sqlite` branch**: Uses SQLite (recommended for Windows users, no database setup required)
+
+**For Windows users:**
+```bash
+git clone https://github.com/Efilant/task-management-app.git
+cd task-management-app
+git checkout windows-sqlite
+```
+
+**For Mac/Linux users:**
+```bash
+git clone https://github.com/Efilant/task-management-app.git
+cd task-management-app
+# Already on main branch with PostgreSQL
+```
+
 ### Prerequisites
 
 - Python 3.8+
 - Node.js 16+
 - npm or yarn
 
-**Note:** SQLite is used as the database, which requires no additional setup or installation.
+**Note:** 
+- **Windows (windows-sqlite branch)**: SQLite is used, which requires no additional setup or installation.
+- **Mac/Linux (main branch)**: PostgreSQL 12+ is required. See backend README for setup instructions.
 
 ### Backend Setup
 
